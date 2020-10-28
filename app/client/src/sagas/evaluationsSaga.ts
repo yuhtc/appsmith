@@ -18,7 +18,10 @@ import {
   getDataTree,
   getUnevaluatedDataTree,
 } from "selectors/dataTreeSelectors";
-import WidgetFactory, { WidgetTypeConfigMap } from "../utils/WidgetFactory";
+import WidgetFactory, {
+  DependantPropertyTriggerFunction,
+  WidgetTypeConfigMap,
+} from "../utils/WidgetFactory";
 import Worker from "worker-loader!../workers/evaluation.worker";
 import {
   EVAL_WORKER_ACTIONS,
@@ -34,6 +37,13 @@ import { WidgetProps } from "../widgets/BaseWidget";
 import PerformanceTracker, {
   PerformanceTransactionName,
 } from "../utils/PerformanceTracker";
+import {
+  DataTree,
+  DataTreeEntity,
+  DataTreeWidget,
+  ENTITY_TYPE,
+} from "../entities/DataTree/dataTreeFactory";
+import { diff } from "deep-diff";
 
 let evaluationWorker: Worker;
 let workerChannel: EventChannel<any>;
@@ -67,6 +77,62 @@ const evalErrorHandler = (errors: EvalError[]) => {
   });
 };
 
+const dependantPropertyTriggerHandler = (
+  trigger: DependantPropertyTriggerFunction,
+  widget: WidgetProps,
+) => {
+  debugger;
+  let updatedWidget = { ...widget };
+  const updateWidget = (updatedValues: WidgetProps) => {
+    updatedWidget = updatedValues;
+  };
+  trigger(widget, updateWidget);
+  return updatedWidget;
+};
+
+function* postEvaluationHandler(dataTree: DataTree) {
+  const oldDataTree = yield select(getDataTree);
+  Object.values(dataTree).forEach((entity: DataTreeEntity) => {
+    if ("ENTITY_TYPE" in entity && entity.ENTITY_TYPE === ENTITY_TYPE.WIDGET) {
+      /** Dependant property triggers **/
+      const widgetDependantPropertyTriggers = WidgetFactory.getWidgetDependantPropertiesTriggersMap(
+        entity.type,
+      );
+
+      if (Object.keys(widgetDependantPropertyTriggers).length) {
+        const oldWidget = oldDataTree[entity.widgetName];
+        let widget = { ...entity } as DataTreeWidget;
+        // If widget has children, add children to the widget
+        if ("children" in widgetDependantPropertyTriggers) {
+          widget = {
+            ...widget,
+            children: entity.children.map((childId: string) =>
+              _.find(dataTree, { widgetId: childId }),
+            ),
+          };
+        }
+        // Find differences in the widget
+        const differences = diff(oldWidget, widget);
+        if (differences) {
+          differences.forEach(difference => {
+            const property = difference.path?.[0];
+            if (property && property in widgetDependantPropertyTriggers) {
+              // update the widget
+              widget = dependantPropertyTriggerHandler(
+                widgetDependantPropertyTriggers[property],
+                widget,
+              ) as DataTreeWidget;
+              dataTree[widget.widgetName] = widget;
+            }
+          });
+        }
+      }
+    }
+  });
+
+  return dataTree;
+}
+
 function* postEvalActionDispatcher(actions: ReduxAction<unknown>[]) {
   for (const action of actions) {
     yield put(action);
@@ -87,11 +153,13 @@ function* evaluateTreeSaga(postEvalActions?: ReduxAction<unknown>[]) {
   const workerResponse = yield take(workerChannel);
   const { errors, dataTree } = workerResponse.data;
   const parsedDataTree = JSON.parse(dataTree);
-  log.debug({ dataTree: parsedDataTree });
+  log.debug({ evaluatedDataTree: parsedDataTree });
   evalErrorHandler(errors);
+  const modifiedTree = yield call(postEvaluationHandler, parsedDataTree);
+  log.debug({ modifiedDataTree: modifiedTree });
   yield put({
     type: ReduxActionTypes.SET_EVALUATED_TREE,
-    payload: parsedDataTree,
+    payload: modifiedTree,
   });
   PerformanceTracker.stopAsyncTracking(
     PerformanceTransactionName.DATA_TREE_EVALUATION,

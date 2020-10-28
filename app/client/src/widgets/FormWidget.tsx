@@ -2,13 +2,35 @@ import React from "react";
 import _ from "lodash";
 import { WidgetProps } from "./BaseWidget";
 import { WidgetType } from "constants/WidgetConstants";
-import ContainerWidget, { ContainerWidgetProps } from "widgets/ContainerWidget";
+import ContainerWidget from "widgets/ContainerWidget";
 import { ContainerComponentProps } from "components/designSystems/appsmith/ContainerComponent";
 import shallowEqual from "shallowequal";
 import * as Sentry from "@sentry/react";
 import withMeta from "./MetaHOC";
+import { DependantPropertyTriggersMap } from "../utils/WidgetFactory";
 
 class FormWidget extends ContainerWidget {
+  static getDependantPropertyTriggersMap(): DependantPropertyTriggersMap {
+    return {
+      children: (widgetProps, updateWidget) => {
+        const formData: any = {};
+        if (widgetProps.children) {
+          widgetProps.children.forEach((widgetData: WidgetProps) => {
+            if (widgetData.value) {
+              formData[widgetData.widgetName] = widgetData.value;
+            }
+          });
+        }
+        if (!shallowEqual(formData, widgetProps.data)) {
+          updateWidget({
+            ...widgetProps,
+            data: formData,
+          });
+        }
+      },
+    };
+  }
+
   checkInvalidChildren = (children: WidgetProps[]): boolean => {
     return _.some(children, child => {
       if ("children" in child) {
@@ -24,36 +46,6 @@ class FormWidget extends ContainerWidget {
   handleResetInputs = () => {
     super.resetChildrenMetaProperty(this.props.widgetId);
   };
-
-  componentDidMount() {
-    super.componentDidMount();
-    this.updateFormData();
-  }
-
-  componentDidUpdate(prevProps: ContainerWidgetProps<any>) {
-    super.componentDidUpdate(prevProps);
-    this.updateFormData();
-  }
-
-  updateFormData() {
-    if (this.props.children) {
-      const formData = this.getFormData(this.props.children[0]);
-      if (!shallowEqual(formData, this.props.data)) {
-        this.props.updateWidgetMetaProperty("data", formData);
-      }
-    }
-  }
-
-  getFormData(formWidget: ContainerWidgetProps<WidgetProps>) {
-    const formData: any = {};
-    if (formWidget.children)
-      formWidget.children.forEach(widgetData => {
-        if (widgetData.value) {
-          formData[widgetData.widgetName] = widgetData.value;
-        }
-      });
-    return formData;
-  }
 
   renderChildWidget(childWidgetData: WidgetProps): React.ReactNode {
     if (childWidgetData.children) {

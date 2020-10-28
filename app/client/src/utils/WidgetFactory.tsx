@@ -14,6 +14,14 @@ import React from "react";
 type WidgetDerivedPropertyType = any;
 export type DerivedPropertiesMap = Record<string, string>;
 export type TriggerPropertiesMap = Record<string, true>;
+export type DependantPropertyTriggersMap = Record<
+  string,
+  DependantPropertyTriggerFunction
+>;
+export type DependantPropertyTriggerFunction = (
+  widget: Readonly<WidgetProps>,
+  updateWidget: (widget: WidgetProps) => void,
+) => void;
 
 class WidgetFactory {
   static widgetMap: Map<
@@ -41,6 +49,10 @@ class WidgetFactory {
     Record<string, string>
   > = new Map();
   static metaPropertiesMap: Map<WidgetType, Record<string, any>> = new Map();
+  static dependantPropertyTriggersMap: Map<
+    WidgetType,
+    DependantPropertyTriggersMap
+  > = new Map();
 
   static registerWidgetBuilder(
     widgetType: WidgetType,
@@ -50,6 +62,7 @@ class WidgetFactory {
     triggerPropertiesMap: TriggerPropertiesMap,
     defaultPropertiesMap: Record<string, string>,
     metaPropertiesMap: Record<string, any>,
+    dependantPropertyTriggersMap: DependantPropertyTriggersMap,
   ) {
     this.widgetMap.set(widgetType, widgetBuilder);
     this.widgetPropValidationMap.set(widgetType, widgetPropertyValidation);
@@ -57,6 +70,10 @@ class WidgetFactory {
     this.triggerPropertiesMap.set(widgetType, triggerPropertiesMap);
     this.defaultPropertiesMap.set(widgetType, defaultPropertiesMap);
     this.metaPropertiesMap.set(widgetType, metaPropertiesMap);
+    this.dependantPropertyTriggersMap.set(
+      widgetType,
+      dependantPropertyTriggersMap,
+    );
   }
 
   static createWidget(
@@ -138,6 +155,20 @@ class WidgetFactory {
     const map = this.metaPropertiesMap.get(widgetType);
     if (!map) {
       console.error("Widget meta properties not defined: ", widgetType);
+      return {};
+    }
+    return map;
+  }
+
+  static getWidgetDependantPropertiesTriggersMap(
+    widgetType: WidgetType,
+  ): DependantPropertyTriggersMap {
+    const map = this.dependantPropertyTriggersMap.get(widgetType);
+    if (!map) {
+      console.error(
+        "Widget dependant properties triggers are not defined: ",
+        widgetType,
+      );
       return {};
     }
     return map;

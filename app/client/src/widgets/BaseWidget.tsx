@@ -30,6 +30,7 @@ import {
   WidgetPropertyValidationType,
 } from "utils/WidgetValidation";
 import {
+  DependantPropertyTriggerFunction,
   DerivedPropertiesMap,
   TriggerPropertiesMap,
 } from "utils/WidgetFactory";
@@ -71,6 +72,17 @@ abstract class BaseWidget<
   }
 
   static getMetaPropertiesMap(): Record<string, any> {
+    return {};
+  }
+
+  static getDependantPropertyTriggersMap(): Record<
+    string,
+    DependantPropertyTriggerFunction
+  > {
+    // This can be utilized when a widget needs to update its property based on
+    // a change in some other property of the widget. The function will be
+    // triggered if a change is found in it's keyed property This is to
+    // avoid any widget to need to use componentDidUpdate
     return {};
   }
 
