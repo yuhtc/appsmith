@@ -79,7 +79,7 @@ const Connected = () => {
         pageId: currentPageId,
         pluginId: datasource?.pluginId,
         datasource: {
-          id: datasource?.id,
+          id: datasource?.id ?? "",
         },
         actionConfiguration: {},
         eventData: {

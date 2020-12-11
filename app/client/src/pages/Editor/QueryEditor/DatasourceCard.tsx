@@ -1,4 +1,4 @@
-import { Datasource } from "api/DatasourcesApi";
+import { Datasource } from "entities/Datasource";
 import { BaseButton } from "components/designSystems/blueprint/ButtonComponent";
 import React from "react";
 import { isNil } from "lodash";
@@ -90,7 +90,7 @@ const DatasourceCard = (props: DatasourceCardProps) => {
   );
   const queryActions = useSelector(getQueryActionsForCurrentPage);
   const queriesWithThisDatasource = queryActions.filter(
-    action => action.config.datasource.id === datasource.id,
+    action => (action.config.datasource as Datasource).id === datasource.id,
   ).length;
 
   const currentFormConfig: Array<any> =
