@@ -15,7 +15,6 @@ import {
   ENTITY_TYPE,
 } from "../entities/DataTree/dataTreeFactory";
 import equal from "fast-deep-equal/es6";
-import * as log from "loglevel";
 import _, {
   every,
   isBoolean,
@@ -49,6 +48,7 @@ import {
 const ctx: Worker = self as any;
 
 let ERRORS: EvalError[] = [];
+let LOGS: any[] = [];
 let WIDGET_TYPE_CONFIG_MAP: WidgetTypeConfigMap = {};
 
 ctx.addEventListener("message", e => {
@@ -62,8 +62,9 @@ ctx.addEventListener("message", e => {
       // We need to clean it to remove any possible functions inside the tree.
       // If functions exist, it will crash the web worker
       const cleanDataTree = JSON.stringify(response);
-      ctx.postMessage({ dataTree: cleanDataTree, errors: ERRORS });
+      ctx.postMessage({ dataTree: cleanDataTree, errors: ERRORS, logs: LOGS });
       ERRORS = [];
+      LOGS = [];
       break;
     }
     case EVAL_WORKER_ACTIONS.EVAL_SINGLE: {
@@ -155,8 +156,9 @@ function getEvaluatedDataTree(dataTree: DataTree): DataTree {
   const loadingTreeEnd = performance.now();
 
   // Validate Widgets
+  const validateTreeStart = performance.now();
   const validated = getValidatedTree(treeWithLoading);
-
+  const validateTreeEnd = performance.now();
   const withoutFunctions = removeFunctionsFromDataTree(validated);
 
   // End counting total time
@@ -168,9 +170,9 @@ function getEvaluatedDataTree(dataTree: DataTree): DataTree {
     createDeps: (createDepsEnd - createDepsStart).toFixed(2),
     evaluate: (evaluatedTreeEnd - evaluatedTreeStart).toFixed(2),
     loading: (loadingTreeEnd - loadingTreeStart).toFixed(2),
+    validate: (validateTreeEnd - validateTreeStart).toFixed(2),
   };
-  log.debug("data tree evaluated");
-  log.debug(timeTaken);
+  LOGS.push({ timeTaken });
   // dataTreeCache = validated;
   return withoutFunctions;
 }
@@ -868,7 +870,7 @@ function evaluateDynamicProperty(
   if (isCacheHit && cacheObj) {
     return cacheObj.evaluated;
   } else {
-    log.debug("eval " + propertyPath);
+    LOGS.push("eval " + propertyPath);
     const dynamicResult = getDynamicValue(
       unEvalPropertyValue,
       currentTree,
